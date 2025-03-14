@@ -1,0 +1,48 @@
+import sqlite3
+import random
+import requests
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
+
+TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
+
+# Функция выбора случайного фильма
+def get_random_movie():
+    conn = sqlite3.connect('movies.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT title, description FROM movies ORDER BY RANDOM() LIMIT 1")
+    movie = cursor.fetchone()
+    conn.close()
+    return movie
+
+# Функция получения подсказки (1-я буква + длина слова)
+def get_hint(movie_title):
+    return movie_title[0] + "*" * (len(movie_title) - 1)
+
+# Старт бота
+@dp.message_handler(commands=['start'])
+async def start_game(message: types.Message):
+    movie = get_random_movie()
+    title, description = movie
+    await message.answer(f"🎬 Угадай фильм:\n\n{description}")
+    dp.current_movie = title.lower()
+
+# Проверка ответа
+@dp.message_handler()
+async def check_answer(message: types.Message):
+    user_answer = message.text.lower()
+    
+    if user_answer == dp.current_movie:
+        await message.reply("✅ Правильно! 🎉")
+        new_movie = get_random_movie()
+        title, description = new_movie
+        dp.current_movie = title.lower()
+        await message.answer(f"🎬 Следующий фильм:\n\n{description}")
+    else:
+        hint = get_hint(dp.current_movie)
+        await message.reply(f"❌ Неверно! Подсказка: {hint}")
+
+if __name__ == '__main__':
+    executor.start_polling(dp)
